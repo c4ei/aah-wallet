@@ -15,8 +15,7 @@ describe("AAH 지갑", () => {
   it("잘못된 주소와 0 이하 송금을 거부한다", () => {
     expect(() => validateTransfer("wrong", "1")).toThrow();
     expect(() => validateTransfer("0x0000000000000000000000000000000000000001", "0")).toThrow();
-    expect(() =>
-      validateTransfer("0x0000000000000000000000000000000000000001", "18.45")
-    ).toThrow();
+    expect(validateTransfer("0x0000000000000000000000000000000000000001", "20"))
+      .toBe(20_000_000_000_000_000_000n);
   });
 });

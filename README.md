@@ -1,4 +1,4 @@
-# AAH Wallet v0.0.1.1
+# AAH Wallet v0.0.3.1
 
 https://github.com/c4ei/aah-wallet
 
@@ -17,6 +17,9 @@ https://github.com/c4ei/aah-wallet
 - 내 주소 QR 표시
 - AAH RPC 주소 및 Chain ID 검증
 - 반응형 PC·모바일 화면
+- 서버 시각 기준 4시간 광고 보상 화면과 API 계약
+- 친구 주소록, 그룹과 초대 코드
+- 그룹 구성원별 순차 송금
 
 ## 빠른 실행
 
@@ -31,6 +34,9 @@ npm run tauri dev
 ## 문서
 
 - [`docs/VERSION_0.0.1.1.md`](docs/VERSION_0.0.1.1.md): 이번 버전 작업·특이점·남은 일
+- [`docs/VERSION_0.0.2.1.md`](docs/VERSION_0.0.2.1.md): 4시간 광고 보상과 서버 계약
+- [`docs/VERSION_0.0.3.1.md`](docs/VERSION_0.0.3.1.md): 친구·그룹·초대·그룹 송금
+- [`docs/CHAIN_0.0.6.1_REQUIREMENTS.md`](docs/CHAIN_0.0.6.1_REQUIREMENTS.md): 체인 보강 요구사항
 - [`docs/TESTING.md`](docs/TESTING.md): 초보자용 실행·테스트 절차
 - [`docs/SECURITY.md`](docs/SECURITY.md): 키 보관과 보안 한계
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): 광고 보상·친구·그룹 개발 순서
@@ -43,20 +49,5 @@ src-tauri/           Rust 기반 로컬 파일·RPC 프록시
 docs/                버전별 작업과 테스트 문서
 ```
 
-
-
-
-sudo apt update
-
-sudo apt install -y \
-  build-essential \
-  pkg-config \
-  libglib2.0-dev \
-  libwebkit2gtk-4.1-dev \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev \
-  curl \
-  wget \
-  file
+Ubuntu에서 처음 빌드할 때 필요한 GUI 패키지는
+[`docs/TESTING.md`](docs/TESTING.md)에 정리되어 있습니다.

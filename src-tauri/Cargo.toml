@@ -1,6 +1,6 @@
 [package]
 name = "aah-wallet"
-version = "0.0.1-1"
+version = "0.0.3-1"
 description = "AAH Chain desktop and mobile wallet"
 authors = ["AAH Project"]
 edition = "2021"
