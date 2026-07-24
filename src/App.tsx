@@ -27,9 +27,15 @@ import {
   saveSocialBook,
   type SocialBook
 } from "./social";
+import {
+  EMPTY_PROFILE,
+  loadProfile,
+  saveProfile,
+  type UserProfile
+} from "./profile";
 
 type Screen = "home" | "create" | "restore";
-type Tab = "wallet" | "reward" | "social";
+type Tab = "wallet" | "reward" | "social" | "site" | "profile";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -59,6 +65,9 @@ export default function App() {
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [groupId, setGroupId] = useState("");
   const [groupAmount, setGroupAmount] = useState("");
+  const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [pendingTransfer, setPendingTransfer] = useState<{ to: string; amount: string } | null>(null);
 
   const wallet = useMemo(() => (vault ? new Wallet(vault.privateKey) : null), [vault]);
 
@@ -74,6 +83,9 @@ export default function App() {
       setSocialBook(loadSocialBook(vault.address));
       const last = localStorage.getItem(`aah-reward-${vault.address.toLowerCase()}`) ?? undefined;
       setRewardStatus(createDevelopmentRewardStatus(last));
+      const savedProfile = loadProfile(vault.address);
+      setProfile(savedProfile);
+      setShowOnboarding(!savedProfile.onboardingDone);
     }
   }, [vault]);
 
@@ -153,8 +165,17 @@ export default function App() {
     }
   }
 
-  async function send(event: FormEvent) {
+  function requestSend(event: FormEvent) {
     event.preventDefault();
+    try {
+      validateTransfer(to, amount);
+      setPendingTransfer({ to, amount });
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function send() {
     if (!wallet || !vault) return;
     try {
       setBusy(true);
@@ -183,6 +204,35 @@ export default function App() {
       setMessage(String(error));
     } finally {
       setBusy(false);
+      setPendingTransfer(null);
+    }
+  }
+
+  function storeProfile(event: FormEvent) {
+    event.preventDefault();
+    if (!vault) return;
+    try {
+      const saved = saveProfile(vault.address, { ...profile, onboardingDone: true });
+      setProfile(saved);
+      setShowOnboarding(false);
+      setMessage("내 정보를 저장했습니다. 이메일은 이 기기에만 보관됩니다.");
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function copyAddress() {
+    if (!vault) return;
+    await navigator.clipboard.writeText(vault.address);
+    setMessage("내 지갑 주소를 복사했습니다.");
+  }
+
+  async function openAahSite() {
+    try {
+      await invoke("open_aah_site");
+      setMessage("AAH 사이트를 별도 보안 창으로 열었습니다.");
+    } catch (error) {
+      setMessage(String(error));
     }
   }
 
@@ -338,22 +388,24 @@ export default function App() {
 
   return (
     <main className="shell">
-      <header><span className="logo">A</span><div><h1>AAH Wallet</h1><p className={networkOk ? "online" : ""}>● {networkOk ? "연결됨" : "연결 확인 필요"}</p></div><button className="secondary small" onClick={lock}>잠금</button></header>
+      <header><span className="logo">A</span><div><h1>{profile.nickname || "AAH Wallet"}</h1><p className={networkOk ? "online" : ""}>● {networkOk ? "AAH 네트워크 연결됨" : "연결 확인 필요"}</p></div><button className="secondary small" onClick={lock}>잠금</button></header>
       <nav className="tabs" aria-label="주요 기능">
         <button className={tab === "wallet" ? "active" : ""} onClick={() => setTab("wallet")}>지갑</button>
         <button className={tab === "reward" ? "active" : ""} onClick={() => setTab("reward")}>광고 보상</button>
         <button className={tab === "social" ? "active" : ""} onClick={() => setTab("social")}>친구·그룹</button>
+        <button className={tab === "site" ? "active" : ""} onClick={() => setTab("site")}>AAH 사이트</button>
+        <button className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>내 정보</button>
       </nav>
       {tab === "wallet" && <>
       <section className="balance-card">
         <span>사용 가능 잔액</span><strong>{formatAah(balance)}</strong>
         <code>{vault.address}</code>
-        <div className="balance-actions"><button onClick={refresh} disabled={busy}>새로고침</button>{qr && <img src={qr} alt="내 지갑 주소 QR" />}</div>
+        <div className="balance-actions"><button onClick={refresh} disabled={busy}>잔액 새로고침</button><button className="secondary" onClick={copyAddress}>주소 복사</button>{qr && <img src={qr} alt="내 지갑 주소 QR" />}</div>
       </section>
       <div className="columns">
         <section className="card">
           <h2>AAH 보내기</h2>
-          <form onSubmit={send} className="stack">
+          <form onSubmit={requestSend} className="stack">
             <label>받는 주소<input value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x..." required /></label>
             <label>수량<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.0" required /></label>
             <p className="muted">기본 수수료: gas 21,000 × gasPrice 1 · 큰 금액은 aah-chain v0.0.6.1 필요</p>
@@ -442,6 +494,68 @@ export default function App() {
               <button disabled={busy}>구성원별 순차 전송</button>
             </form>
             <p className="warning">다중 송금 컨트랙트가 없어 일부 거래만 성공할 수 있습니다. 테스트넷에서 소액으로 확인하세요.</p>
+          </section>
+        </div>
+      )}
+      {tab === "profile" && (
+        <section className="card profile-card">
+          <span className="eyebrow">이 기기에만 저장</span>
+          <h2>내 정보</h2>
+          <form className="stack" onSubmit={storeProfile}>
+            <label>닉네임<input value={profile.nickname}
+              onChange={(event) => setProfile({ ...profile, nickname: event.target.value })}
+              placeholder="예: 아하친구" maxLength={24} required /></label>
+            <label>이메일 (선택)<input type="email" value={profile.email}
+              onChange={(event) => setProfile({ ...profile, email: event.target.value })}
+              placeholder="기기 변경 안내용으로 추후 서버 연동" /></label>
+            <button>저장</button>
+          </form>
+          <p className="muted">현재 이메일은 로그인이나 지갑 복구에 사용되지 않으며 서버로 전송하지 않습니다. 지갑 복구에는 반드시 12단어 SEED가 필요합니다.</p>
+        </section>
+      )}
+      {tab === "site" && (
+        <section className="card site-card">
+          <span className="eyebrow">AAH OFFICIAL</span>
+          <h2>aah.name</h2>
+          <p>AAH 소식과 웹 서비스를 별도 보안 창에서 확인합니다.</p>
+          <div className="site-preview">
+            <span className="logo">A</span>
+            <div><b>AAH 공식 사이트</b><small>https://aah.name</small></div>
+          </div>
+          <button onClick={openAahSite}>AAH 사이트 열기</button>
+          <p className="muted">웹사이트 창은 지갑의 개인키·SEED·서명 기능에 접근할 수 없습니다. 사이트 창을 닫아도 지갑은 계속 실행됩니다.</p>
+        </section>
+      )}
+      {showOnboarding && (
+        <div className="modal-backdrop">
+          <section className="modal card" role="dialog" aria-modal="true" aria-label="처음 사용 안내">
+            <span className="eyebrow">처음 오셨군요</span>
+            <h2>어렵지 않게 시작해 볼게요</h2>
+            <ol className="steps">
+              <li><b>내 이름 정하기</b><span>친구가 알아보기 쉬운 닉네임을 써요.</span></li>
+              <li><b>주소 공유하기</b><span>주소 복사나 QR로 안전하게 AAH를 받아요.</span></li>
+              <li><b>SEED 지키기</b><span>이메일로는 지갑을 복구할 수 없어요.</span></li>
+            </ol>
+            <form className="stack" onSubmit={storeProfile}>
+              <input value={profile.nickname}
+                onChange={(event) => setProfile({ ...profile, nickname: event.target.value })}
+                placeholder="사용할 닉네임" maxLength={24} required autoFocus />
+              <input type="email" value={profile.email}
+                onChange={(event) => setProfile({ ...profile, email: event.target.value })}
+                placeholder="이메일 (선택)" />
+              <button>AAH Wallet 시작하기</button>
+            </form>
+          </section>
+        </div>
+      )}
+      {pendingTransfer && (
+        <div className="modal-backdrop">
+          <section className="modal card" role="dialog" aria-modal="true" aria-label="송금 최종 확인">
+            <span className="eyebrow">마지막 확인</span>
+            <h2>{pendingTransfer.amount} AAH를 보낼까요?</h2>
+            <dl><dt>받는 주소</dt><dd><code>{pendingTransfer.to}</code></dd><dt>예상 수수료</dt><dd>0.000000000000021 AAH</dd></dl>
+            <p className="warning">블록체인 송금은 전송 후 취소할 수 없습니다.</p>
+            <div className="actions"><button onClick={send} disabled={busy}>확인하고 보내기</button><button className="secondary" onClick={() => setPendingTransfer(null)} disabled={busy}>취소</button></div>
           </section>
         </div>
       )}

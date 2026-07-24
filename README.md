@@ -1,4 +1,4 @@
-# AAH Wallet v0.0.3.1
+# AAH Wallet v0.0.3.2
 
 https://github.com/c4ei/aah-wallet
 
@@ -20,6 +20,9 @@ https://github.com/c4ei/aah-wallet
 - 서버 시각 기준 4시간 광고 보상 화면과 API 계약
 - 친구 주소록, 그룹과 초대 코드
 - 그룹 구성원별 순차 송금
+- 처음 사용 안내·닉네임·선택 이메일 프로필
+- 송금 최종 확인과 내 주소 복사
+- IPC 권한이 분리된 `aah.name` 전용 웹 창
 
 ## 빠른 실행
 
@@ -36,6 +39,7 @@ npm run tauri dev
 - [`docs/VERSION_0.0.1.1.md`](docs/VERSION_0.0.1.1.md): 이번 버전 작업·특이점·남은 일
 - [`docs/VERSION_0.0.2.1.md`](docs/VERSION_0.0.2.1.md): 4시간 광고 보상과 서버 계약
 - [`docs/VERSION_0.0.3.1.md`](docs/VERSION_0.0.3.1.md): 친구·그룹·초대·그룹 송금
+- [`docs/VERSION_0.0.3.2.md`](docs/VERSION_0.0.3.2.md): 사용자 친화 UI와 AAH 사이트 창
 - [`docs/CHAIN_0.0.6.1_REQUIREMENTS.md`](docs/CHAIN_0.0.6.1_REQUIREMENTS.md): 체인 보강 요구사항
 - [`docs/TESTING.md`](docs/TESTING.md): 초보자용 실행·테스트 절차
 - [`docs/SECURITY.md`](docs/SECURITY.md): 키 보관과 보안 한계

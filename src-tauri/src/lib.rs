@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use url::Url;
 
 const VAULT_FILE: &str = "wallet.aahvault";
@@ -92,6 +92,27 @@ async fn rpc_call(
         .map_err(|error| format!("AAH 노드 응답 해석 실패: {error}"))
 }
 
+#[tauri::command]
+fn open_aah_site(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("aah-site") {
+        window
+            .set_focus()
+            .map_err(|error| format!("사이트 창 열기 실패: {error}"))?;
+        return Ok(());
+    }
+
+    let url =
+        Url::parse("https://aah.name").map_err(|error| format!("사이트 주소 오류: {error}"))?;
+    // 원격 사이트는 main 지갑 창과 분리하며 capabilities에 등록하지 않아 IPC를 사용할 수 없습니다.
+    WebviewWindowBuilder::new(&app, "aah-site", WebviewUrl::External(url))
+        .title("AAH 공식 사이트")
+        .inner_size(1100.0, 760.0)
+        .min_inner_size(360.0, 640.0)
+        .build()
+        .map_err(|error| format!("AAH 사이트 창 생성 실패: {error}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -99,7 +120,8 @@ pub fn run() {
             vault_exists,
             save_vault,
             load_vault,
-            rpc_call
+            rpc_call,
+            open_aah_site
         ])
         .run(tauri::generate_context!())
         .expect("AAH Wallet 실행 중 오류가 발생했습니다.");
