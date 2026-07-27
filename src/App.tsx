@@ -33,9 +33,23 @@ import {
   saveProfile,
   type UserProfile
 } from "./profile";
+import {
+  createDepositSession,
+  executeSwap,
+  getSwapStatus,
+  quoteIsExpired,
+  requestQuote,
+  USDT_NETWORKS,
+  validateUsdtAmount,
+  withdrawAah,
+  type DepositSession,
+  type SwapProgress,
+  type SwapQuote,
+  type UsdtNetwork
+} from "./exchange";
 
 type Screen = "home" | "create" | "restore";
-type Tab = "wallet" | "reward" | "social" | "site" | "profile";
+type Tab = "wallet" | "exchange" | "reward" | "social" | "site" | "profile";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -68,6 +82,12 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [pendingTransfer, setPendingTransfer] = useState<{ to: string; amount: string } | null>(null);
+  const [usdtNetwork, setUsdtNetwork] = useState<UsdtNetwork>("TRON");
+  const [deposit, setDeposit] = useState<DepositSession | null>(null);
+  const [depositQr, setDepositQr] = useState("");
+  const [swapProgress, setSwapProgress] = useState<SwapProgress | null>(null);
+  const [usdtAmount, setUsdtAmount] = useState("");
+  const [swapQuote, setSwapQuote] = useState<SwapQuote | null>(null);
 
   const wallet = useMemo(() => (vault ? new Wallet(vault.privateKey) : null), [vault]);
 
@@ -88,6 +108,14 @@ export default function App() {
       setShowOnboarding(!savedProfile.onboardingDone);
     }
   }, [vault]);
+
+  useEffect(() => {
+    if (!deposit?.depositAddress) {
+      setDepositQr("");
+      return;
+    }
+    QRCode.toDataURL(deposit.depositAddress, { width: 220, margin: 1 }).then(setDepositQr);
+  }, [deposit]);
 
   async function saveWallet(created: { privateKey: string; address: string }, mnemonic: string) {
     if (!backupConfirmed && mnemonic) throw new Error("SEED 백업 확인에 체크해 주세요.");
@@ -233,6 +261,83 @@ export default function App() {
       setMessage("AAH 사이트를 별도 보안 창으로 열었습니다.");
     } catch (error) {
       setMessage(String(error));
+    }
+  }
+
+  async function beginUsdtDeposit() {
+    if (!vault) return;
+    try {
+      setBusy(true);
+      setSwapQuote(null);
+      setSwapProgress(null);
+      const session = await createDepositSession(usdtNetwork, vault.address);
+      setDeposit(session);
+      setMessage(`${usdtNetwork} USDT 전용 입금주소를 발급했습니다.`);
+    } catch (error) {
+      setMessage(`USDT 입금 서비스를 시작하지 못했습니다: ${String(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshSwap() {
+    if (!deposit) return;
+    try {
+      setBusy(true);
+      const progress = await getSwapStatus(deposit.swapId);
+      setSwapProgress(progress);
+      if (progress.depositedAmount) setUsdtAmount(progress.depositedAmount);
+      setMessage("입금 및 교환 상태를 새로 확인했습니다.");
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function quoteSwap() {
+    if (!deposit) return;
+    try {
+      setBusy(true);
+      const value = validateUsdtAmount(usdtAmount);
+      const quote = await requestQuote(deposit.swapId, value);
+      setSwapQuote(quote);
+      setMessage("AAH 교환 견적을 받았습니다. 만료 전에 내용을 확인해 주세요.");
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmSwap() {
+    if (!swapQuote) return;
+    if (quoteIsExpired(swapQuote)) {
+      setSwapQuote(null);
+      setMessage("견적이 만료되었습니다. 새 견적을 받아 주세요.");
+      return;
+    }
+    try {
+      setBusy(true);
+      setSwapProgress(await executeSwap(swapQuote.quoteId));
+      setMessage("USDT를 AAH로 교환했습니다. 이제 내 지갑으로 받을 수 있습니다.");
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function receiveAah() {
+    if (!deposit || !vault) return;
+    try {
+      setBusy(true);
+      setSwapProgress(await withdrawAah(deposit.swapId, vault.address));
+      setMessage("내 AAH 지갑으로 출금을 요청했습니다.");
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -391,6 +496,7 @@ export default function App() {
       <header><span className="logo">A</span><div><h1>{profile.nickname || "AAH Wallet"}</h1><p className={networkOk ? "online" : ""}>● {networkOk ? "AAH 네트워크 연결됨" : "연결 확인 필요"}</p></div><button className="secondary small" onClick={lock}>잠금</button></header>
       <nav className="tabs" aria-label="주요 기능">
         <button className={tab === "wallet" ? "active" : ""} onClick={() => setTab("wallet")}>지갑</button>
+        <button className={tab === "exchange" ? "active" : ""} onClick={() => setTab("exchange")}>USDT 교환</button>
         <button className={tab === "reward" ? "active" : ""} onClick={() => setTab("reward")}>광고 보상</button>
         <button className={tab === "social" ? "active" : ""} onClick={() => setTab("social")}>친구·그룹</button>
         <button className={tab === "site" ? "active" : ""} onClick={() => setTab("site")}>AAH 사이트</button>
@@ -425,6 +531,85 @@ export default function App() {
           : <p className="muted">이 앱을 연 뒤 전송한 거래가 아직 없습니다.</p>}
       </section>
       </>}
+      {tab === "exchange" && (
+        <section className="exchange-layout">
+          <div className="card exchange-hero">
+            <span className="eyebrow">AAH SIMPLE SWAP · v0.0.4.1</span>
+            <h2>USDT로 AAH 받기</h2>
+            <p>입금 네트워크를 고르고, 입금이 확인되면 AAH로 교환한 뒤 현재 지갑으로 받습니다.</p>
+            <ol className="swap-steps">
+              <li className={deposit ? "done" : "active"}><b>1</b><span>USDT 입금</span></li>
+              <li className={swapProgress?.status === "SWAPPED" || swapProgress?.status === "COMPLETED" ? "done" : deposit ? "active" : ""}><b>2</b><span>AAH 교환</span></li>
+              <li className={swapProgress?.status === "COMPLETED" ? "done" : swapProgress?.status === "SWAPPED" ? "active" : ""}><b>3</b><span>내 지갑으로 받기</span></li>
+            </ol>
+          </div>
+
+          <div className="columns">
+            <section className="card">
+              <h2>1. 입금 네트워크</h2>
+              <div className="network-options">
+                {USDT_NETWORKS.map((network) => (
+                  <button key={network.id} className={usdtNetwork === network.id ? "network-option active" : "network-option"}
+                    onClick={() => { setUsdtNetwork(network.id); setDeposit(null); setSwapQuote(null); }}>
+                    <b>{network.label} <small>{network.standard}</small></b>
+                    <span>{network.description}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={beginUsdtDeposit} disabled={busy}>USDT 입금주소 받기</button>
+              <p className="warning">선택한 네트워크의 USDT만 보내세요. 다른 네트워크로 입금하면 복구되지 않을 수 있습니다.</p>
+            </section>
+
+            <section className="card deposit-card">
+              <h2>USDT 입금</h2>
+              {deposit ? <>
+                {depositQr && <img src={depositQr} alt={`${deposit.network} USDT 입금주소 QR`} />}
+                <code>{deposit.depositAddress}</code>
+                {deposit.memo && <p><b>MEMO/TAG:</b> <code>{deposit.memo}</code></p>}
+                <dl>
+                  <dt>최소 입금</dt><dd>{deposit.minimumDeposit} USDT</dd>
+                  <dt>필요 확인</dt><dd>{deposit.confirmationsRequired}회</dd>
+                  <dt>상태</dt><dd>{swapProgress?.status ?? deposit.status}</dd>
+                </dl>
+                <button className="secondary" onClick={refreshSwap} disabled={busy}>입금 확인</button>
+              </> : <p className="muted">왼쪽에서 네트워크를 선택해 전용 입금주소를 발급받으세요.</p>}
+            </section>
+          </div>
+
+          <div className="columns">
+            <section className="card">
+              <h2>2. AAH로 교환</h2>
+              <label>확인된 USDT 수량
+                <input value={usdtAmount} onChange={(event) => setUsdtAmount(event.target.value)}
+                  inputMode="decimal" placeholder="예: 100" />
+              </label>
+              <button onClick={quoteSwap} disabled={busy || !deposit}>교환 견적 보기</button>
+              {swapQuote && <div className="quote-box">
+                <dl>
+                  <dt>교환 전</dt><dd>{swapQuote.grossAah} AAH</dd>
+                  <dt>재단 수수료</dt><dd>{swapQuote.foundationFeeAah} AAH</dd>
+                  <dt>출금 비용</dt><dd>{swapQuote.networkFeeAah} AAH</dd>
+                  <dt>최소 수령</dt><dd><strong>{swapQuote.minimumReceivedAah} AAH</strong></dd>
+                  <dt>견적 만료</dt><dd>{new Date(swapQuote.expiresAt).toLocaleString()}</dd>
+                </dl>
+                <button onClick={confirmSwap} disabled={busy}>이 견적으로 교환</button>
+              </div>}
+            </section>
+
+            <section className="card">
+              <h2>3. 내 지갑으로 받기</h2>
+              <p className="muted">출금 주소는 잠금 해제된 현재 지갑으로 고정됩니다.</p>
+              <code>{vault.address}</code>
+              <button onClick={receiveAah}
+                disabled={busy || !deposit || !["SWAPPED", "WITHDRAWING"].includes(swapProgress?.status ?? "")}>
+                AAH 받기
+              </button>
+              {swapProgress?.txHash && <p>출금 거래<br/><code>{swapProgress.txHash}</code></p>}
+              <p className="custody-note">입금 USDT는 고객 지급 의무가 있는 준비금입니다. 재단 수익은 견적에 표시된 서비스 수수료만 별도 회계 처리합니다.</p>
+            </section>
+          </div>
+        </section>
+      )}
       {tab === "reward" && (
         <section className="card reward-card">
           <span className="eyebrow">v0.0.2.1 · 개발 연동 모드</span>

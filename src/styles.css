@@ -34,7 +34,7 @@ code { overflow-wrap:anywhere; color:#c6d9e8; }.balance-card img { width:88px; h
 .check input { width:auto; margin:0; }.divider { text-align:center; color:#5b7188; }
 .muted { color:#7d93a9; font-size:13px; } dl { display:grid; grid-template-columns:90px 1fr; gap:10px; font-size:13px; } dt { color:#7890a7; } dd { margin:0; overflow-wrap:anywhere; }
 .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); max-width:calc(100% - 40px); padding:12px 18px; border-radius:12px; background:#e8f4ef; color:#13261f; box-shadow:0 10px 36px #0007; }
-.tabs { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin:0 0 18px; padding:6px; border:1px solid #203449; border-radius:16px; background:#091726; }
+.tabs { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:0 0 18px; padding:6px; border:1px solid #203449; border-radius:16px; background:#091726; }
 .tabs button { color:#91a8bd; background:transparent; }
 .tabs button.active { color:#062117; background:#2ed4a6; }
 .reward-card { max-width:680px; margin:0 auto; }
@@ -54,4 +54,21 @@ code { overflow-wrap:anywhere; color:#c6d9e8; }.balance-card img { width:88px; h
 .steps { display:grid; gap:12px; padding:0; list-style:none; margin:22px 0; }
 .steps li { display:grid; gap:4px; padding:13px 15px; border-radius:13px; background:#071522; }
 .steps span { color:#8da3b8; font-size:13px; }
+.exchange-layout { display:grid; gap:18px; }
+.exchange-hero { text-align:center; }
+.swap-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:24px 0 0; padding:0; list-style:none; }
+.swap-steps li { display:flex; align-items:center; justify-content:center; gap:9px; padding:13px; border:1px solid #203449; border-radius:14px; color:#6f879d; background:#071522; }
+.swap-steps li b { display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:#1b3044; }
+.swap-steps li.active { color:#e8f0fa; border-color:#2ed4a6; }
+.swap-steps li.done { color:#2ed4a6; }
+.swap-steps li.done b { color:#052016; background:#2ed4a6; }
+.network-options { display:grid; gap:9px; margin-bottom:14px; }
+.network-option { display:grid; gap:4px; text-align:left; color:#dbe8f5; background:#071522; border:1px solid #203449; }
+.network-option.active { border-color:#2ed4a6; box-shadow:0 0 0 2px #2ed4a620; }
+.network-option small { color:#2ed4a6; }
+.network-option span { color:#7d93a9; font-size:12px; font-weight:500; }
+.deposit-card img { display:block; width:150px; height:150px; margin:8px auto 18px; border-radius:12px; }
+.quote-box { margin-top:16px; padding:16px; border:1px solid #2b4057; border-radius:14px; background:#071522; }
+.quote-box strong { color:#2ed4a6; }
+.custody-note { margin-top:20px; padding:13px; border-radius:12px; color:#a9bdd0; background:#071522; font-size:12px; line-height:1.6; }
 @media (max-width:700px) { .columns,.social-grid { grid-template-columns:1fr; }.social-grid>.card:last-child{grid-column:auto}.seed-grid{grid-template-columns:repeat(2,1fr)}.hero{padding:28px 20px}.balance-card strong{font-size:32px}.shell{padding-top:20px}.tabs{grid-template-columns:repeat(3,1fr)}.tabs button{padding:11px 6px;font-size:12px}.reward-time{font-size:24px} }

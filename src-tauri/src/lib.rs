@@ -2,9 +2,12 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(mobile)]
+use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
 const VAULT_FILE: &str = "wallet.aahvault";
+const CEX_BASE_URL: &str = "https://cex.aah.name";
 
 fn vault_path(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -92,35 +95,86 @@ async fn rpc_call(
         .map_err(|error| format!("AAH 노드 응답 해석 실패: {error}"))
 }
 
+fn validate_cex_path(path: &str) -> Result<Url, String> {
+    if !path.starts_with("/api/v1/simple-swap/") || path.contains("..") {
+        return Err("허용하지 않은 CEX API 경로입니다.".into());
+    }
+    Url::parse(&format!("{CEX_BASE_URL}{path}"))
+        .map_err(|error| format!("CEX API 주소 오류: {error}"))
+}
+
+#[tauri::command]
+async fn cex_call(path: String, method: String, body: Option<Value>) -> Result<Value, String> {
+    let url = validate_cex_path(&path)?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|error| format!("CEX 연결 준비 실패: {error}"))?;
+    let request = match method.as_str() {
+        "GET" => client.get(url),
+        "POST" => client.post(url).json(&body.unwrap_or(Value::Null)),
+        _ => return Err("CEX API는 GET과 POST만 허용합니다.".into()),
+    };
+    let response = request
+        .send()
+        .await
+        .map_err(|error| format!("CEX 연결 실패: {error}"))?;
+    let status = response.status();
+    let value = response
+        .json::<Value>()
+        .await
+        .map_err(|error| format!("CEX 응답 해석 실패: {error}"))?;
+    if !status.is_success() {
+        let detail = value.get("message").and_then(Value::as_str).unwrap_or("서비스 요청 실패");
+        return Err(format!("CEX 오류({status}): {detail}"));
+    }
+    Ok(value)
+}
+
 #[tauri::command]
 fn open_aah_site(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("aah-site") {
-        window
-            .set_focus()
-            .map_err(|error| format!("사이트 창 열기 실패: {error}"))?;
-        return Ok(());
+    #[cfg(mobile)]
+    {
+        // 모바일은 다중 WebView 창 대신 운영체제 기본 브라우저를 사용합니다.
+        // 원격 사이트가 지갑 WebView 및 Tauri IPC와 섞이지 않도록 하기 위한 분기입니다.
+        return app
+            .opener()
+            .open_url("https://aah.name", None::<&str>)
+            .map_err(|error| format!("기본 브라우저 열기 실패: {error}"));
     }
 
-    let url =
-        Url::parse("https://aah.name").map_err(|error| format!("사이트 주소 오류: {error}"))?;
-    // 원격 사이트는 main 지갑 창과 분리하며 capabilities에 등록하지 않아 IPC를 사용할 수 없습니다.
-    WebviewWindowBuilder::new(&app, "aah-site", WebviewUrl::External(url))
-        .title("AAH 공식 사이트")
-        .inner_size(1100.0, 760.0)
-        .min_inner_size(360.0, 640.0)
-        .build()
-        .map_err(|error| format!("AAH 사이트 창 생성 실패: {error}"))?;
-    Ok(())
+    #[cfg(desktop)]
+    {
+        if let Some(window) = app.get_webview_window("aah-site") {
+            window
+                .set_focus()
+                .map_err(|error| format!("사이트 창 열기 실패: {error}"))?;
+            return Ok(());
+        }
+
+        let url =
+            Url::parse("https://aah.name").map_err(|error| format!("사이트 주소 오류: {error}"))?;
+        // 원격 사이트는 main 지갑 창과 분리하며 capabilities에 등록하지 않아 IPC를 사용할 수 없습니다.
+        WebviewWindowBuilder::new(&app, "aah-site", WebviewUrl::External(url))
+            .title("AAH 공식 사이트")
+            .inner_size(1100.0, 760.0)
+            .min_inner_size(360.0, 640.0)
+            .build()
+            .map_err(|error| format!("AAH 사이트 창 생성 실패: {error}"))?;
+        Ok(())
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             vault_exists,
             save_vault,
             load_vault,
             rpc_call,
+            cex_call,
             open_aah_site
         ])
         .run(tauri::generate_context!())
@@ -136,6 +190,13 @@ mod tests {
         assert!(validate_rpc_url("http://127.0.0.1:8545").is_ok());
         assert!(validate_rpc_url("file:///etc/passwd").is_err());
         assert!(validate_rpc_url("http://user:pass@127.0.0.1:8545").is_err());
+    }
+
+    #[test]
+    fn cex_proxy_only_allows_simple_swap_api() {
+        assert!(validate_cex_path("/api/v1/simple-swap/status/s1").is_ok());
+        assert!(validate_cex_path("/api/v1/price").is_err());
+        assert!(validate_cex_path("/api/v1/simple-swap/../admin").is_err());
     }
 
     #[test]

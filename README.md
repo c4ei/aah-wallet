@@ -1,4 +1,4 @@
-# AAH Wallet v0.0.3.2
+# AAH Wallet v0.0.4.1
 
 https://github.com/c4ei/aah-wallet
 
@@ -22,7 +22,12 @@ https://github.com/c4ei/aah-wallet
 - 그룹 구성원별 순차 송금
 - 처음 사용 안내·닉네임·선택 이메일 프로필
 - 송금 최종 확인과 내 주소 복사
-- IPC 권한이 분리된 `aah.name` 전용 웹 창
+- PC에서는 IPC 권한이 분리된 `aah.name` 전용 웹 창
+- Android/iOS에서는 `aah.name`을 시스템 기본 브라우저로 열어 지갑과 분리
+- TRON·Solana·BSC USDT 입금주소 발급
+- USDT 입금 확인 → AAH 견적·교환 → 현재 AAH 지갑 출금의 3단계 간편 교환
+- 재단 서비스 수수료·출금 비용·최소 수령액을 분리한 견적 표시
+- 허용된 `cex.aah.name` 간편교환 API만 호출하는 Tauri 프록시
 
 ## 빠른 실행
 
@@ -31,7 +36,7 @@ npm install
 npm run tauri dev
 ```
 
-먼저 `aah-chain v0.0.5.2` 노드를 `127.0.0.1:8545`에서 실행해야 합니다.
+먼저 `aah-chain v0.0.6.1` 노드를 `127.0.0.1:8545`에서 실행해야 합니다.
 설치와 상세 테스트는 [`docs/TESTING.md`](docs/TESTING.md)를 참고하세요.
 
 ## 문서
@@ -40,6 +45,9 @@ npm run tauri dev
 - [`docs/VERSION_0.0.2.1.md`](docs/VERSION_0.0.2.1.md): 4시간 광고 보상과 서버 계약
 - [`docs/VERSION_0.0.3.1.md`](docs/VERSION_0.0.3.1.md): 친구·그룹·초대·그룹 송금
 - [`docs/VERSION_0.0.3.2.md`](docs/VERSION_0.0.3.2.md): 사용자 친화 UI와 AAH 사이트 창
+- [`docs/VERSION_0.0.3.3.md`](docs/VERSION_0.0.3.3.md): 플랫폼 분기와 설치·빌드 안내
+- [`docs/VERSION_0.0.4.1.md`](docs/VERSION_0.0.4.1.md): USDT 간편교환과 재단 수익·준비금 정책
+- [`docs/INSTALL.md`](docs/INSTALL.md): Windows·Linux·Android·iOS 설치와 빌드
 - [`docs/CHAIN_0.0.6.1_REQUIREMENTS.md`](docs/CHAIN_0.0.6.1_REQUIREMENTS.md): 체인 보강 요구사항
 - [`docs/TESTING.md`](docs/TESTING.md): 초보자용 실행·테스트 절차
 - [`docs/SECURITY.md`](docs/SECURITY.md): 키 보관과 보안 한계
