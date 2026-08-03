@@ -1,14 +1,14 @@
 {
-  "name": "aah-wallet",
+  "name": "ieum-wallet",
   "private": true,
-  "version": "0.0.4-1",
+  "version": "0.0.9-0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "node scripts/tauri-clean-env.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

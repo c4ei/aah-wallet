@@ -7,7 +7,7 @@
 - 거래 금액과 수수료 계산을 `u64`에서 `u128`로 통일
 - `eth_getTransactionCount(..., "pending")` 지원
 - mempool의 동일 계정 nonce 예약 및 대체 정책
-- `eth_estimateGas`와 `eth_gasPrice` 또는 AAH 전용 수수료 RPC
+- `eth_estimateGas`와 `eth_gasPrice` 또는 IEUM 전용 수수료 RPC
 - 거래 영수증의 `pending / confirmed / failed` 상태 일관성
 - RPC 오류 코드와 메시지 표준화
 - 동일 raw transaction 재전송의 멱등 처리
@@ -23,7 +23,7 @@
 
 ## 지갑과 함께 실행할 시험
 
-- 20 AAH 이상 전송
+- 20 IEUM 이상 전송
 - 같은 계정에서 10건 연속 전송
 - 같은 raw transaction 2회 제출
 - 수신 노드와 제출 노드가 다른 경우 영수증 조회

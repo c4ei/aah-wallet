@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { restoreFromMnemonic, restoreFromPrivateKey, validateTransfer } from "./wallet";
 
-describe("AAH 지갑", () => {
+describe("IEUM 지갑", () => {
   it("표준 SEED를 같은 주소로 복원한다", () => {
     const wallet = restoreFromMnemonic("test test test test test test test test test test test junk");
     expect(wallet.address.toLowerCase()).toBe("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");

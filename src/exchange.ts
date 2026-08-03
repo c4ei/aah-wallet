@@ -79,7 +79,7 @@ export function requestQuote(swapId: string, usdtAmount: string) {
   return cexCall<SwapQuote>("/api/v1/simple-swap/quote", "POST", {
     swapId,
     fromAsset: "USDT",
-    toAsset: "AAH",
+    toAsset: "IEUM",
     amount: usdtAmount
   });
 }

@@ -1,8 +1,8 @@
 [package]
-name = "aah-wallet"
-version = "0.0.4-1"
-description = "AAH Chain desktop and mobile wallet"
-authors = ["AAH Project"]
+name = "ieum-wallet"
+version = "0.0.9-0"
+description = "IEUM Chain desktop and mobile wallet"
+authors = ["IEUM Project"]
 edition = "2021"
 
 [lib]
@@ -10,7 +10,7 @@ name = "aah_wallet_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "aah-wallet"
+name = "ieum-wallet"
 path = "src/main.rs"
 
 [build-dependencies]

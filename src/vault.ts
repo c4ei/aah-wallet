@@ -49,6 +49,43 @@ async function deriveKey(password: string, salt: Uint8Array, iterations: number)
   );
 }
 
+export async function encryptLocalData<T>(payload: T, secret: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(`ieum-local-data:${secret}`, salt, ITERATIONS);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: asArrayBuffer(iv) },
+    key,
+    encoder.encode(JSON.stringify(payload))
+  );
+  return JSON.stringify({
+    version: 1,
+    kdf: "PBKDF2-SHA256",
+    iterations: ITERATIONS,
+    salt: toBase64(salt),
+    iv: toBase64(iv),
+    ciphertext: toBase64(new Uint8Array(encrypted))
+  } satisfies EncryptedVault);
+}
+
+export async function decryptLocalData<T>(raw: string, secret: string): Promise<T> {
+  const encrypted = JSON.parse(raw) as EncryptedVault;
+  if (encrypted.version !== 1 || encrypted.kdf !== "PBKDF2-SHA256") {
+    throw new Error("지원하지 않는 로컬 보안 데이터입니다.");
+  }
+  const key = await deriveKey(
+    `ieum-local-data:${secret}`,
+    fromBase64(encrypted.salt),
+    encrypted.iterations
+  );
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: asArrayBuffer(fromBase64(encrypted.iv)) },
+    key,
+    asArrayBuffer(fromBase64(encrypted.ciphertext))
+  );
+  return JSON.parse(decoder.decode(plain)) as T;
+}
+
 // 개인키는 평문으로 디스크에 저장하지 않고 AES-256-GCM으로 암호화합니다.
 export async function encryptVault(payload: VaultPayload, password: string): Promise<string> {
   if (password.length < 8) throw new Error("비밀번호는 8자 이상이어야 합니다.");

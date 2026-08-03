@@ -17,7 +17,7 @@ sudo apt install -y build-essential curl wget file libssl-dev \
 
 Windows에서는 Microsoft C++ Build Tools와 WebView2가 필요합니다.
 
-## 2. AAH 노드 실행
+## 2. IEUM 노드 실행
 
 `aah-chain` 폴더에서:
 
@@ -84,12 +84,12 @@ cargo test
 ### 전송
 
 1. 제네시스에서 개인키를 보유한 테스트 계정을 복원
-2. 받는 주소와 소량의 AAH 입력
+2. 받는 주소와 소량의 IEUM 입력
 3. 전송 후 거래 해시 표시 확인
 4. 받는 지갑에서 새로고침하여 잔액 확인
 5. 노드의 `eth_getTransactionReceipt`로 거래 해시 확인
 
-현재 체인의 거래 금액 필드가 `u64`라 한 번에 약 `18.44 AAH`를 넘길 수 없습니다.
+현재 체인의 거래 금액 필드가 `u64`라 한 번에 약 `18.44 IEUM`를 넘길 수 없습니다.
 그보다 큰 금액은 여러 번 나누거나, 차후 체인의 거래 필드를 `u128`로 확장해야 합니다.
 
 ## 5. 모바일 화면 확인

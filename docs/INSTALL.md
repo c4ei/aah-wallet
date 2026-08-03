@@ -1,12 +1,12 @@
-# AAH Wallet 설치 및 빌드
+# IEUM Wallet 설치 및 빌드
 
 ## 공통 준비
 
 소스를 내려받은 뒤 프로젝트 폴더에서 의존성을 설치합니다.
 
 ```bash
-git clone https://github.com/c4ei/aah-wallet.git
-cd aah-wallet
+git clone https://github.com/c4ei/ieum-wallet.git
+cd ieum-wallet
 npm install
 ```
 
@@ -130,7 +130,7 @@ npm run tauri ios build
 서명 설정이 필요하면 생성된 Xcode 프로젝트를 엽니다.
 
 ```bash
-open src-tauri/gen/apple/aah-wallet.xcodeproj
+open src-tauri/gen/apple/ieum-wallet.xcodeproj
 ```
 
 Xcode의 `Signing & Capabilities`에서 Team, Bundle Identifier

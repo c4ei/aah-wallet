@@ -1,5 +1,7 @@
 use serde_json::{json, Value};
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 #[cfg(mobile)]
@@ -7,6 +9,7 @@ use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
 const VAULT_FILE: &str = "wallet.aahvault";
+const CALL_AUDIT_FILE: &str = "call-audit.jsonl";
 const CEX_BASE_URL: &str = "https://cex.aah.name";
 
 fn vault_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -27,6 +30,96 @@ fn write_vault(path: &Path, contents: &str) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     fs::write(&temporary, contents).map_err(|error| format!("임시 지갑 저장 실패: {error}"))?;
     fs::rename(&temporary, path).map_err(|error| format!("지갑 저장 완료 처리 실패: {error}"))
+}
+
+fn append_call_audit(path: &Path, event: &Value) -> Result<(), String> {
+    const ALLOWED_EVENTS: &[&str] = &[
+        "permission_granted",
+        "permission_denied",
+        "call_started",
+        "connected",
+        "call_ended",
+        "call_failed",
+    ];
+    let event_name = event.get("event").and_then(Value::as_str).unwrap_or("");
+    let call_id = event.get("callId").and_then(Value::as_str).unwrap_or("");
+    let room_id = event.get("roomId").and_then(Value::as_str).unwrap_or("");
+    let occurred_at = event
+        .get("occurredAt")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if !ALLOWED_EVENTS.contains(&event_name)
+        || call_id.is_empty()
+        || call_id.len() > 80
+        || room_id.is_empty()
+        || room_id.len() > 256
+        || occurred_at.is_empty()
+    {
+        return Err("통화 감사 이벤트 형식이 올바르지 않습니다.".into());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("감사 폴더 생성 실패: {error}"))?;
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|error| format!("감사 파일 열기 실패: {error}"))?;
+    serde_json::to_writer(&mut file, event)
+        .map_err(|error| format!("감사 기록 변환 실패: {error}"))?;
+    file.write_all(b"\n")
+        .map_err(|error| format!("감사 기록 저장 실패: {error}"))
+}
+
+#[tauri::command]
+fn write_call_audit(app: AppHandle, event: Value) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("감사 저장 경로를 찾지 못했습니다: {error}"))?
+        .join(CALL_AUDIT_FILE);
+    append_call_audit(&path, &event)
+}
+
+fn call_audit_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join(CALL_AUDIT_FILE))
+        .map_err(|error| format!("감사 저장 경로를 찾지 못했습니다: {error}"))
+}
+
+fn read_call_audit_file(path: &Path) -> Result<Vec<Value>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path).map_err(|error| format!("감사 기록 읽기 실패: {error}"))?;
+    let mut entries = raw
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str::<Value>(line)
+                .map_err(|error| format!("감사 기록 형식 오류: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if entries.len() > 200 {
+        entries.drain(..entries.len() - 200);
+    }
+    entries.reverse();
+    Ok(entries)
+}
+
+#[tauri::command]
+fn read_call_audit(app: AppHandle) -> Result<Vec<Value>, String> {
+    read_call_audit_file(&call_audit_path(&app)?)
+}
+
+#[tauri::command]
+fn clear_call_audit(app: AppHandle) -> Result<(), String> {
+    let path = call_audit_path(&app)?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|error| format!("감사 기록 삭제 실패: {error}"))?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -72,6 +165,15 @@ async fn rpc_call(
         "eth_getTransactionByHash",
         "eth_getTransactionReceipt",
         "eth_blockNumber",
+        "ieum_nodeStatus",
+        "ieum_syncStatus",
+        "ieum_finalizedBlock",
+        "ieum_networkIdentity",
+        "ieum_protocolVersion",
+        "ieum_recoveryStatus",
+        "ieum_getRecoveryByTransaction",
+        "ieum_sendCommunication",
+        "ieum_pollCommunication",
     ];
     if !ALLOWED.contains(&method.as_str()) {
         return Err(format!("지갑에서 허용하지 않은 RPC 메서드입니다: {method}"));
@@ -85,14 +187,29 @@ async fn rpc_call(
         .json(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}))
         .send()
         .await
-        .map_err(|error| format!("AAH 노드 연결 실패: {error}"))?;
-    if !response.status().is_success() {
-        return Err(format!("AAH 노드 HTTP 오류: {}", response.status()));
-    }
-    response
-        .json::<Value>()
+        .map_err(|error| format!("IEUM 노드 연결 실패: {error}"))?;
+    let status = response.status();
+    let response_text = response
+        .text()
         .await
-        .map_err(|error| format!("AAH 노드 응답 해석 실패: {error}"))
+        .map_err(|error| format!("IEUM 노드 응답 읽기 실패(HTTP {status}): {error}"))?;
+    if !status.is_success() {
+        return Err(format!(
+            "IEUM 노드 HTTP 오류: {status}. 서버 응답: {}",
+            response_preview(&response_text)
+        ));
+    }
+    if response_text.trim().is_empty() {
+        return Err(format!(
+            "IEUM 노드가 빈 응답을 반환했습니다(HTTP {status})."
+        ));
+    }
+    serde_json::from_str::<Value>(&response_text).map_err(|error| {
+        format!(
+            "IEUM 노드가 JSON이 아닌 응답을 반환했습니다(HTTP {status}): {error}. 서버 응답: {}",
+            response_preview(&response_text)
+        )
+    })
 }
 
 fn validate_cex_path(path: &str) -> Result<Url, String> {
@@ -120,15 +237,68 @@ async fn cex_call(path: String, method: String, body: Option<Value>) -> Result<V
         .await
         .map_err(|error| format!("CEX 연결 실패: {error}"))?;
     let status = response.status();
-    let value = response
-        .json::<Value>()
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_owned();
+    let response_text = response
+        .text()
         .await
-        .map_err(|error| format!("CEX 응답 해석 실패: {error}"))?;
+        .map_err(|error| format!("CEX 응답 읽기 실패(HTTP {status}): {error}"))?;
+
     if !status.is_success() {
-        let detail = value.get("message").and_then(Value::as_str).unwrap_or("서비스 요청 실패");
-        return Err(format!("CEX 오류({status}): {detail}"));
+        let detail = cex_error_detail(&response_text);
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(format!(
+                "CEX 간편교환 API가 아직 서버에 배포되지 않았습니다(HTTP {status}). \
+                 cex.aah.name에 {path} 구현 또는 Caddy 연결이 필요합니다. 서버 응답: {detail}"
+            ));
+        }
+        return Err(format!("CEX 오류(HTTP {status}): {detail}"));
     }
-    Ok(value)
+
+    if response_text.trim().is_empty() {
+        return Err(format!(
+            "CEX가 빈 응답을 반환했습니다(HTTP {status}). API 서버 또는 Caddy 연결을 확인해 주세요."
+        ));
+    }
+
+    serde_json::from_str::<Value>(&response_text).map_err(|error| {
+        let preview = response_preview(&response_text);
+        format!(
+            "CEX가 JSON이 아닌 응답을 반환했습니다(HTTP {status}, Content-Type: {content_type}): \
+             {error}. 서버 응답: {preview}"
+        )
+    })
+}
+
+fn cex_error_detail(text: &str) -> String {
+    serde_json::from_str::<Value>(text)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("message")
+                .or_else(|| value.get("error"))
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .filter(|message| !message.trim().is_empty())
+        .unwrap_or_else(|| response_preview(text))
+}
+
+fn response_preview(text: &str) -> String {
+    let single_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if single_line.is_empty() {
+        return "(응답 본문 없음)".into();
+    }
+    const MAX_CHARS: usize = 240;
+    let mut preview = single_line.chars().take(MAX_CHARS).collect::<String>();
+    if single_line.chars().count() > MAX_CHARS {
+        preview.push('…');
+    }
+    preview
 }
 
 #[tauri::command]
@@ -156,11 +326,11 @@ fn open_aah_site(app: AppHandle) -> Result<(), String> {
             Url::parse("https://aah.name").map_err(|error| format!("사이트 주소 오류: {error}"))?;
         // 원격 사이트는 main 지갑 창과 분리하며 capabilities에 등록하지 않아 IPC를 사용할 수 없습니다.
         WebviewWindowBuilder::new(&app, "aah-site", WebviewUrl::External(url))
-            .title("AAH 공식 사이트")
+            .title("IEUM 공식 사이트")
             .inner_size(1100.0, 760.0)
             .min_inner_size(360.0, 640.0)
             .build()
-            .map_err(|error| format!("AAH 사이트 창 생성 실패: {error}"))?;
+            .map_err(|error| format!("IEUM 사이트 창 생성 실패: {error}"))?;
         Ok(())
     }
 }
@@ -175,10 +345,13 @@ pub fn run() {
             load_vault,
             rpc_call,
             cex_call,
+            write_call_audit,
+            read_call_audit,
+            clear_call_audit,
             open_aah_site
         ])
         .run(tauri::generate_context!())
-        .expect("AAH Wallet 실행 중 오류가 발생했습니다.");
+        .expect("IEUM Wallet 실행 중 오류가 발생했습니다.");
 }
 
 #[cfg(test)]
@@ -200,6 +373,22 @@ mod tests {
     }
 
     #[test]
+    fn cex_error_detail_supports_json_html_and_empty_bodies() {
+        assert_eq!(cex_error_detail(r#"{"message":"not found"}"#), "not found");
+        assert_eq!(
+            cex_error_detail("<html><body>404 Not Found</body></html>"),
+            "<html><body>404 Not Found</body></html>"
+        );
+        assert_eq!(cex_error_detail(""), "(응답 본문 없음)");
+    }
+
+    #[test]
+    fn response_preview_is_single_line_and_bounded() {
+        assert_eq!(response_preview("hello\n  world"), "hello world");
+        assert!(response_preview(&"가".repeat(300)).chars().count() <= 241);
+    }
+
+    #[test]
     fn vault_write_is_atomic_and_readable() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(VAULT_FILE);
@@ -208,5 +397,50 @@ mod tests {
             fs::read_to_string(path).unwrap(),
             r#"{"version":1,"ciphertext":"test"}"#
         );
+    }
+
+    #[test]
+    fn call_audit_accepts_metadata_but_rejects_unknown_events() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(CALL_AUDIT_FILE);
+        append_call_audit(
+            &path,
+            &json!({
+                "event": "call_started",
+                "callId": "call-1",
+                "roomId": "room-1",
+                "occurredAt": "2026-07-29T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("call_started"));
+        assert!(append_call_audit(
+            &path,
+            &json!({"event":"recording","callId":"x","roomId":"y","occurredAt":"z"})
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn call_audit_read_is_newest_first_and_clearable() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(CALL_AUDIT_FILE);
+        for index in 1..=2 {
+            append_call_audit(
+                &path,
+                &json!({
+                    "event": "call_started",
+                    "callId": format!("call-{index}"),
+                    "roomId": "room-1",
+                    "occurredAt": format!("2026-07-29T00:00:0{index}Z")
+                }),
+            )
+            .unwrap();
+        }
+        let entries = read_call_audit_file(&path).unwrap();
+        assert_eq!(entries[0]["callId"], "call-2");
+        assert_eq!(entries[1]["callId"], "call-1");
+        fs::remove_file(&path).unwrap();
+        assert!(read_call_audit_file(&path).unwrap().is_empty());
     }
 }

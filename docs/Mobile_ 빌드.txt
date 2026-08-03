@@ -26,7 +26,7 @@ ls "$NDK_HOME"
 
 프로젝트에서 Android 구조를 최초 한 번 생성해.
 
-cd ~/www/aah-wallet
+cd ~/www/ieum-wallet
 
 npm install
 npm run tauri android init
@@ -69,7 +69,7 @@ Mac에서:
 
 xcode-select --install
 
-cd ~/www/aah-wallet
+cd ~/www/ieum-wallet
 npm install
 npm run tauri ios init
 
@@ -83,7 +83,7 @@ npm run tauri ios build
 
 서명이나 기기 선택이 필요하면 생성된 Xcode 프로젝트를 열어 설정해.
 
-open src-tauri/gen/apple/aah-wallet.xcodeproj
+open src-tauri/gen/apple/ieum-wallet.xcodeproj
 
 Xcode의 Signing & Capabilities에서 다음을 지정해야 해.
 
@@ -151,8 +151,8 @@ cargo --version
 
 소스를 받은 뒤 개발 실행:
 
-git clone https://github.com/c4ei/aah-wallet.git
-cd aah-wallet
+git clone https://github.com/c4ei/ieum-wallet.git
+cd ieum-wallet
 
 npm install
 npm run tauri dev

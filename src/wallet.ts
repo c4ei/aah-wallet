@@ -1,6 +1,8 @@
 import { HDNodeWallet, Mnemonic, Wallet, formatEther, isAddress, parseEther } from "ethers";
 
 export const CHAIN_ID = 21004;
+export const EXPECTED_GENESIS_HASH = "0x41cfb669940d7244c1f5d77ef0c12ff3d4dcf90ad7734a7cc42e5c8421eee6a7";
+export const REQUIRED_PROTOCOL_VERSION = 2;
 export const HD_PATH = "m/44'/60'/0'/0/0";
 
 export function createWallet() {
@@ -32,5 +34,5 @@ export function validateTransfer(to: string, amount: string) {
 
 export function formatAah(value: bigint): string {
   const text = formatEther(value);
-  return `${Number(text).toLocaleString("ko-KR", { maximumFractionDigits: 8 })} AAH`;
+  return `${Number(text).toLocaleString("ko-KR", { maximumFractionDigits: 8 })} IEUM`;
 }
