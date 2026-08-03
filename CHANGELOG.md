@@ -1,5 +1,12 @@
 # 변경 이력
 
+## 0.0.9.1 - 2026-08-03
+
+- GitHub Actions 한 번의 실행으로 Windows, Ubuntu, Android 빌드
+- Windows NSIS 설치 파일과 MSI, Ubuntu AppImage와 DEB, Android ARM64 APK 생성
+- Actions Artifacts에서 운영체제별 결과물 다운로드 지원
+- npm/Cargo/Tauri 내부 SemVer는 `0.0.9-1`, 배포 표기는 `0.0.9.1`로 통일
+
 ## 0.0.9-0 - 2026-08-03
 
 - IEUM Chain v0.21.0 운영 상태 RPC 연동
