@@ -8,6 +8,9 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
+#[cfg(desktop)]
+use tauri_plugin_updater::UpdaterExt;
+
 const VAULT_FILE: &str = "wallet.aahvault";
 const CALL_AUDIT_FILE: &str = "call-audit.jsonl";
 const CEX_BASE_URL: &str = "https://cex.aah.name";
@@ -339,6 +342,20 @@ fn open_aah_site(app: AppHandle) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = check_and_install_update(handle).await {
+                        eprintln!("[월렛 자동 업데이트] 확인 또는 설치 실패: {error}");
+                    }
+                });
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             vault_exists,
             save_vault,
@@ -352,6 +369,39 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("IEUM Wallet 실행 중 오류가 발생했습니다.");
+}
+
+#[cfg(desktop)]
+async fn check_and_install_update(app: AppHandle) -> Result<(), String> {
+    let Some(update) = app
+        .updater()
+        .map_err(|error| format!("업데이트 기능 초기화 실패: {error}"))?
+        .check()
+        .await
+        .map_err(|error| format!("최신 버전 확인 실패: {error}"))?
+    else {
+        println!("[월렛 자동 업데이트] 현재 버전이 최신입니다.");
+        return Ok(());
+    };
+
+    println!(
+        "[월렛 자동 업데이트] 새 버전 {}을 내려받습니다.",
+        update.version
+    );
+    update
+        .download_and_install(
+            |downloaded, total| {
+                if let Some(total) = total {
+                    println!("[월렛 자동 업데이트] {downloaded}/{total} bytes");
+                }
+            },
+            || println!("[월렛 자동 업데이트] 다운로드 완료, 설치를 시작합니다."),
+        )
+        .await
+        .map_err(|error| format!("업데이트 다운로드 또는 설치 실패: {error}"))?;
+
+    println!("[월렛 자동 업데이트] 설치 완료, 월렛을 다시 시작합니다.");
+    app.restart();
 }
 
 #[cfg(test)]
