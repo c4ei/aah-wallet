@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { restoreFromMnemonic, restoreFromPrivateKey, validateTransfer } from "./wallet";
+import {
+  CHAIN_ID,
+  EXPECTED_GENESIS_HASH,
+  restoreFromMnemonic,
+  restoreFromPrivateKey,
+  validateTransfer
+} from "./wallet";
 
 describe("IEUM 지갑", () => {
+  it("v0.21.4 운영망 식별자를 고정한다", () => {
+    expect(CHAIN_ID).toBe(21004);
+    expect(EXPECTED_GENESIS_HASH).toBe(
+      "0x657ce0cfeb8ad38d88a23711ec2664e5e1033aa8ffd5bb648a02ca0f348a9e1a"
+    );
+  });
+
   it("표준 SEED를 같은 주소로 복원한다", () => {
     const wallet = restoreFromMnemonic("test test test test test test test test test test test junk");
     expect(wallet.address.toLowerCase()).toBe("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");

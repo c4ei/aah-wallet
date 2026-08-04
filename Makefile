@@ -1,4 +1,4 @@
-VERSION ?= 0.0.9.1
+VERSION ?= 0.0.9.2
 WORKFLOW ?= wallet-build.yml
 
 .PHONY: wallet-check wallet-ubuntu wallet-windows wallet-android wallet-all
@@ -23,6 +23,6 @@ wallet-android:
 	npm run build:android
 
 wallet-all:
-	@test "$(VERSION)" = "0.0.9.1" || (echo "현재 릴리스 버전은 0.0.9.1입니다." && exit 1)
+	@test "$(VERSION)" = "0.0.9.2" || (echo "현재 릴리스 버전은 0.0.9.2입니다." && exit 1)
 	gh workflow run $(WORKFLOW) --ref main -f version=$(VERSION)
 	@echo "GitHub Actions 실행을 요청했습니다: IEUM Wallet $(VERSION)"
