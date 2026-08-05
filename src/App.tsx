@@ -87,7 +87,7 @@ export default function App() {
   const [vault, setVault] = useState<VaultPayload | null>(null);
   const [hasVault, setHasVault] = useState(false);
   const [password, setPassword] = useState("");
-  const defaultRpcUrl = import.meta.env.VITE_DEFAULT_RPC_URL || "https://rpc.ieum.aah.name";
+  const defaultRpcUrl = import.meta.env.VITE_DEFAULT_RPC_URL || "https://irpc.aah.name";
   const walletEdition = import.meta.env.VITE_WALLET_EDITION || "light";
   const [rpcUrl, setRpcUrl] = useState(defaultRpcUrl);
   const [balance, setBalance] = useState<bigint>(0n);

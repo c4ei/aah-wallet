@@ -7,7 +7,7 @@ if (!new Set(["light", "normal"]).has(edition)) {
 
 const environment = edition === "normal"
   ? "VITE_WALLET_EDITION=normal\nVITE_DEFAULT_RPC_URL=http://127.0.0.1:8989\n"
-  : "VITE_WALLET_EDITION=light\nVITE_DEFAULT_RPC_URL=https://rpc.ieum.aah.name\n";
+  : "VITE_WALLET_EDITION=light\nVITE_DEFAULT_RPC_URL=https://irpc.aah.name\n";
 
 await writeFile(".env.production.local", environment);
 if (edition === "normal") await mkdir("src-tauri/binaries", { recursive: true });

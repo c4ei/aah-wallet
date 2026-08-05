@@ -6,7 +6,7 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.0.10.0
+        default: 0.0.10.1
         type: string
       core_ref:
         description: ieum-chain tag, branch or commit for Normal
@@ -18,8 +18,7 @@ permissions:
   contents: write
 
 env:
-  DISPLAY_VERSION: 0.0.10.0
-  INTERNAL_VERSION: 0.0.10-0
+  DISPLAY_VERSION: 0.0.10.1
 
 jobs:
   validate:
@@ -32,9 +31,7 @@ jobs:
         shell: bash
         run: |
           test "${{ inputs.version }}" = "$DISPLAY_VERSION"
-          test "$(node -p "require('./package.json').version")" = "$INTERNAL_VERSION"
-          test "$(node -p "require('./src-tauri/tauri.conf.json').version")" = "$INTERNAL_VERSION"
-          test "$(sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -1)" = "$INTERNAL_VERSION"
+          npm run validate:release
           test -n "${{ vars.TAURI_UPDATER_PUBLIC_KEY }}"
           test -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
       - run: npm ci
@@ -99,16 +96,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: wallet-${{ matrix.edition }}-latest
-          releaseName: IEUM Wallet ${{ matrix.label }} v0.0.10.0
-          releaseBody: Signed IEUM Wallet ${{ matrix.label }} v0.0.10.0 release.
+          releaseName: IEUM Wallet ${{ matrix.label }} v${{ inputs.version }}
+          releaseBody: Signed IEUM Wallet ${{ matrix.label }} v${{ inputs.version }} release.
           releaseDraft: false
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
           uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: IEUM-Wallet-${{ matrix.label }}-v0.0.10.0-[platform]-[arch]-[bundle]
-          releaseAssetNamePattern: IEUM-Wallet-${{ matrix.label }}-v0.0.10.0-[platform]-[arch]-[bundle][setup].[ext]
+          workflowArtifactNamePattern: IEUM-Wallet-${{ matrix.label }}-v${{ inputs.version }}-[platform]-[arch]-[bundle]
+          releaseAssetNamePattern: IEUM-Wallet-${{ matrix.label }}-v${{ inputs.version }}-[platform]-[arch]-[bundle][setup].[ext]
           args: --config src-tauri/tauri.${{ matrix.edition }}.conf.json ${{ matrix.features }} --bundles ${{ matrix.bundles }}
 
   android-light:
@@ -134,7 +131,7 @@ jobs:
         run: npm run tauri -- android build --ci --debug --apk --target aarch64 --config src-tauri/tauri.light.conf.json
       - uses: actions/upload-artifact@v4
         with:
-          name: IEUM-Wallet-Light-v0.0.10.0-android-arm64
+          name: IEUM-Wallet-Light-v${{ inputs.version }}-android-arm64
           path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
 

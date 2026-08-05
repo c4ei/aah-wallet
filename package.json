@@ -1,13 +1,14 @@
 {
   "name": "ieum-wallet",
   "private": true,
-  "version": "0.0.10-0",
+  "version": "0.0.10-1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "validate:release": "node scripts/validate-release-version.mjs",
     "tauri": "node scripts/tauri-clean-env.mjs",
     "build:ubuntu": "npm run tauri -- build --bundles appimage,deb",
     "build:windows": "npm run tauri -- build --bundles nsis,msi",
