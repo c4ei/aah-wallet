@@ -6,12 +6,12 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.0.10.5
+        default: 0.0.10.6
         type: string
       core_ref:
         description: ieum-chain tag, branch or commit for Normal
         required: true
-        default: v0.21.6
+        default: v0.21.7
         type: string
       android_release:
         description: Build a signed Android release AAB (requires Android signing secrets)
@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 env:
-  DISPLAY_VERSION: 0.0.10.5
+  DISPLAY_VERSION: 0.0.10.6
 
 jobs:
   validate:
@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $version = (cargo metadata --no-deps --format-version 1 --manifest-path ieum-chain-source/Cargo.toml | ConvertFrom-Json).packages[0].version
-          if ($version -ne "0.21.6") { throw "Normal core must be IEUM Chain 0.21.6 (actual: $version)" }
+          if ($version -ne "0.21.7") { throw "Normal core must be IEUM Chain 0.21.7 (actual: $version)" }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: dtolnay/rust-toolchain@stable
