@@ -1,0 +1,14 @@
+{
+  "productName": "IEUM Wallet Normal",
+  "identifier": "net.aah.wallet.normal",
+  "bundle": {
+    "externalBin": ["binaries/ieum-chain"]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/c4ei/ieum-wallet/releases/download/wallet-normal-latest/latest.json"
+      ]
+    }
+  }
+}

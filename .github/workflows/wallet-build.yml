@@ -1,4 +1,4 @@
-name: Build and release IEUM Wallet
+name: Build and release IEUM Wallet Light and Normal
 
 on:
   workflow_dispatch:
@@ -6,27 +6,29 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.0.9.3
+        default: 0.0.10.0
+        type: string
+      core_ref:
+        description: ieum-chain tag, branch or commit for Normal
+        required: true
+        default: main
         type: string
 
 permissions:
   contents: write
 
 env:
-  DISPLAY_VERSION: 0.0.9.3
-  INTERNAL_VERSION: 0.0.9-3
+  DISPLAY_VERSION: 0.0.10.0
+  INTERNAL_VERSION: 0.0.10-0
 
 jobs:
   validate:
-    name: Validate source
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Validate requested and source versions
+        with: { node-version: 22, cache: npm }
+      - name: Validate source versions and updater secrets
         shell: bash
         run: |
           test "${{ inputs.version }}" = "$DISPLAY_VERSION"
@@ -40,21 +42,26 @@ jobs:
       - run: npm test
 
   desktop:
-    name: Release ${{ matrix.name }}
     needs: validate
+    name: ${{ matrix.label }} / ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows x86_64
-            os: windows-latest
-            args: --bundles nsis,msi
-          - name: Ubuntu x86_64
-            os: ubuntu-22.04
-            args: --bundles appimage,deb
+          - { edition: light, label: Light, platform: Windows, os: windows-latest, bundles: "nsis,msi", features: "" }
+          - { edition: light, label: Light, platform: Ubuntu, os: ubuntu-22.04, bundles: "appimage,deb", features: "" }
+          - { edition: normal, label: Normal, platform: Windows, os: windows-latest, bundles: "nsis,msi", features: "--features embedded-core" }
+          - { edition: normal, label: Normal, platform: Ubuntu, os: ubuntu-22.04, bundles: "appimage,deb", features: "--features embedded-core" }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout IEUM Core
+        if: matrix.edition == 'normal'
+        uses: actions/checkout@v4
+        with:
+          repository: c4ei/ieum-chain
+          ref: ${{ inputs.core_ref }}
+          path: ieum-chain-source
       - name: Install Ubuntu dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -62,78 +69,82 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 xdg-utils
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+        with: { node-version: 22, cache: npm }
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: |
+            src-tauri -> target
+            ieum-chain-source -> target
       - run: npm ci
-      - name: Refresh Rust lockfile for updater dependency
+      - name: Build and stage IEUM Core
+        if: matrix.edition == 'normal'
+        shell: bash
+        run: |
+          cargo build --release --locked --manifest-path ieum-chain-source/Cargo.toml
+          node scripts/stage-core-sidecar.mjs
+      - run: node scripts/prepare-edition.mjs ${{ matrix.edition }}
+      - name: Refresh wallet Rust lockfile
+        working-directory: src-tauri
         run: cargo generate-lockfile
       - name: Inject updater verification key
         env:
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
         run: node scripts/configure-updater.mjs
-      - name: Build, sign and publish desktop update
+      - name: Build, sign and publish
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: wallet-v0.0.9.3
-          releaseName: IEUM Wallet v0.0.9.3
-          releaseBody: IEUM Wallet v0.0.9.3 - signed automatic updater bootstrap release.
+          tagName: wallet-${{ matrix.edition }}-latest
+          releaseName: IEUM Wallet ${{ matrix.label }} v0.0.10.0
+          releaseBody: Signed IEUM Wallet ${{ matrix.label }} v0.0.10.0 release.
           releaseDraft: false
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
           uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: IEUM-Wallet-v0.0.9.3-[platform]-[arch]-[bundle]
-          releaseAssetNamePattern: IEUM-Wallet-v0.0.9.3-[platform]-[arch]-[bundle][setup].[ext]
-          args: ${{ matrix.args }}
+          workflowArtifactNamePattern: IEUM-Wallet-${{ matrix.label }}-v0.0.10.0-[platform]-[arch]-[bundle]
+          releaseAssetNamePattern: IEUM-Wallet-${{ matrix.label }}-v0.0.10.0-[platform]-[arch]-[bundle][setup].[ext]
+          args: --config src-tauri/tauri.${{ matrix.edition }}.conf.json ${{ matrix.features }} --bundles ${{ matrix.bundles }}
 
-  android:
-    name: Build Android ARM64
+  android-light:
     needs: validate
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+        with: { node-version: 22, cache: npm }
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
+        with: { targets: aarch64-linux-android }
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+        with: { distribution: temurin, java-version: "17" }
       - uses: android-actions/setup-android@v3
-      - name: Install Android NDK
-        shell: bash
-        run: sdkmanager "ndk;28.2.13676358"
+      - run: sdkmanager "ndk;28.2.13676358"
       - run: npm ci
-      - name: Initialize Android project
-        shell: bash
-        run: |
-          if [ ! -d src-tauri/gen/android ]; then
-            npm run tauri -- android init --ci
-          fi
-      - name: Build Android ARM64 debug APK
+      - run: node scripts/prepare-edition.mjs light
+      - shell: bash
+        run: if [ ! -d src-tauri/gen/android ]; then npm run tauri -- android init --ci; fi
+      - name: Build Light Android APK
         env:
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/28.2.13676358
-        run: npm run tauri -- android build --ci --debug --apk --target aarch64
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
+        run: npm run tauri -- android build --ci --debug --apk --target aarch64 --config src-tauri/tauri.light.conf.json
+      - uses: actions/upload-artifact@v4
         with:
-          name: IEUM-Wallet-v0.0.9.3-android-arm64
+          name: IEUM-Wallet-Light-v0.0.10.0-android-arm64
           path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
+
+  migration-default:
+    name: Keep 0.0.9.3 users on Light
+    needs: desktop
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Make Light the default GitHub latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit wallet-light-latest --latest

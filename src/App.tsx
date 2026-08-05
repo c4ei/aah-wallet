@@ -87,7 +87,9 @@ export default function App() {
   const [vault, setVault] = useState<VaultPayload | null>(null);
   const [hasVault, setHasVault] = useState(false);
   const [password, setPassword] = useState("");
-  const [rpcUrl, setRpcUrl] = useState("http://127.0.0.1:8989");
+  const defaultRpcUrl = import.meta.env.VITE_DEFAULT_RPC_URL || "https://rpc.ieum.aah.name";
+  const walletEdition = import.meta.env.VITE_WALLET_EDITION || "light";
+  const [rpcUrl, setRpcUrl] = useState(defaultRpcUrl);
   const [balance, setBalance] = useState<bigint>(0n);
   const [networkOk, setNetworkOk] = useState(false);
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus | null>(null);
@@ -945,7 +947,7 @@ export default function App() {
           {showNetworkSettings && <div className="network-details">
             <label>IEUM 노드 RPC<input value={rpcUrl} onChange={(e) => setRpcUrl(e.target.value)} /></label>
             <button className="secondary" onClick={refresh}>연결 다시 확인</button>
-            <dl><dt>Chain ID</dt><dd>{CHAIN_ID}</dd><dt>기본 RPC</dt><dd>127.0.0.1:8989</dd></dl>
+            <dl><dt>에디션</dt><dd>{walletEdition === "normal" ? "Normal (내장 Core)" : "Light (원격 RPC)"}</dd><dt>Chain ID</dt><dd>{CHAIN_ID}</dd><dt>기본 RPC</dt><dd>{defaultRpcUrl.replace(/^https?:\/\//, "")}</dd></dl>
           </div>}
         </section>
       </div>

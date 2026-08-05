@@ -1,0 +1,11 @@
+{
+  "productName": "IEUM Wallet Light",
+  "identifier": "net.aah.wallet.light",
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/c4ei/ieum-wallet/releases/download/wallet-light-latest/latest.json"
+      ]
+    }
+  }
+}

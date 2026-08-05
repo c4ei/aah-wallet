@@ -1,5 +1,14 @@
 # 변경 이력
 
+## 0.0.10.0 - 2026-08-04
+
+- 원격 RPC 기반 Light와 IEUM Core 내장 Normal 설치 파일 분리
+- Normal 실행 시 기존 로컬 Core 확인 후 필요할 때만 sidecar 자동 시작
+- Core 원장과 노드 키를 사용자 데이터 폴더에 보존하고 월렛 종료 시 안전하게 정리
+- Light/Normal 제품 식별자와 자동 업데이트 채널 분리
+- Windows·Ubuntu는 두 에디션, Android는 Light APK 빌드
+- npm/Cargo/Tauri 내부 SemVer는 `0.0.10-0`, 배포 표기는 `0.0.10.0`으로 통일
+
 ## 0.0.9.3 - 2026-08-04
 
 - Windows와 Ubuntu 데스크톱 월렛에 서명 검증 기반 자동 업데이트 추가

@@ -2,10 +2,16 @@ use serde_json::{json, Value};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+#[cfg(feature = "embedded-core")]
+use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
+#[cfg(feature = "embedded-core")]
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 #[cfg(mobile)]
 use tauri_plugin_opener::OpenerExt;
+#[cfg(feature = "embedded-core")]
+use tauri_plugin_shell::{process::CommandChild, ShellExt};
 use url::Url;
 
 #[cfg(desktop)]
@@ -14,6 +20,67 @@ use tauri_plugin_updater::UpdaterExt;
 const VAULT_FILE: &str = "wallet.aahvault";
 const CALL_AUDIT_FILE: &str = "call-audit.jsonl";
 const CEX_BASE_URL: &str = "https://cex.aah.name";
+
+#[cfg(feature = "embedded-core")]
+struct EmbeddedCore(Mutex<Option<CommandChild>>);
+
+#[cfg(feature = "embedded-core")]
+fn local_core_is_running() -> bool {
+    let address = SocketAddr::from(([127, 0, 0, 1], 8989));
+    TcpStream::connect_timeout(&address, std::time::Duration::from_millis(250)).is_ok()
+}
+
+#[cfg(feature = "embedded-core")]
+fn start_embedded_core(app: &AppHandle) -> Result<Option<CommandChild>, String> {
+    if local_core_is_running() {
+        println!("[내장 Core] 127.0.0.1:8989에서 실행 중인 IEUM Core를 사용합니다.");
+        return Ok(None);
+    }
+
+    let core_directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("내장 Core 데이터 경로 확인 실패: {error}"))?
+        .join("core");
+    fs::create_dir_all(&core_directory)
+        .map_err(|error| format!("내장 Core 데이터 폴더 생성 실패: {error}"))?;
+
+    let (mut events, child) = app
+        .shell()
+        .sidecar("ieum-chain")
+        .map_err(|error| format!("내장 Core 실행 파일 확인 실패: {error}"))?
+        .current_dir(core_directory)
+        .args(["--mode", "client"])
+        .spawn()
+        .map_err(|error| format!("내장 Core 시작 실패: {error}"))?;
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = events.recv().await {
+            match event {
+                tauri_plugin_shell::process::CommandEvent::Stdout(line)
+                | tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                    eprintln!("[내장 Core] {}", String::from_utf8_lossy(&line));
+                }
+                tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
+                    eprintln!("[내장 Core] 종료됨: {status:?}");
+                }
+                _ => {}
+            }
+        }
+    });
+    Ok(Some(child))
+}
+
+#[cfg(feature = "embedded-core")]
+fn stop_embedded_core(app: &AppHandle) {
+    if let Some(state) = app.try_state::<EmbeddedCore>() {
+        if let Ok(mut child) = state.0.lock() {
+            if let Some(mut process) = child.take() {
+                let _ = process.kill();
+            }
+        }
+    }
+}
 
 fn vault_path(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -340,9 +407,17 @@ fn open_aah_site(app: AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    #[cfg(feature = "embedded-core")]
+    let builder = builder.plugin(tauri_plugin_shell::init());
+
+    let builder = builder
         .setup(|app| {
+            #[cfg(feature = "embedded-core")]
+            {
+                let child = start_embedded_core(app.handle())?;
+                app.manage(EmbeddedCore(Mutex::new(child)));
+            }
             #[cfg(desktop)]
             {
                 app.handle()
@@ -366,7 +441,16 @@ pub fn run() {
             read_call_audit,
             clear_call_audit,
             open_aah_site
-        ])
+        ]);
+
+    #[cfg(feature = "embedded-core")]
+    let builder = builder.on_window_event(|window, event| {
+        if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+            stop_embedded_core(window.app_handle());
+        }
+    });
+
+    builder
         .run(tauri::generate_context!())
         .expect("IEUM Wallet 실행 중 오류가 발생했습니다.");
 }

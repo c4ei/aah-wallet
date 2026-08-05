@@ -1,7 +1,7 @@
 node_modules/
+.env.production.local
 dist/
 src-tauri/target/
 *.log
 .DS_Store
 .secret
-ieum-wallet-updater.key
