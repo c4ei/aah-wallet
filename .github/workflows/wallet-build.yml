@@ -6,19 +6,24 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.0.10.2
+        default: 0.0.10.3
         type: string
       core_ref:
         description: ieum-chain tag, branch or commit for Normal
         required: true
         default: main
         type: string
+      android_release:
+        description: Build a signed Android release AAB (requires Android signing secrets)
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 env:
-  DISPLAY_VERSION: 0.0.10.2
+  DISPLAY_VERSION: 0.0.10.3
 
 jobs:
   validate:
@@ -63,7 +68,15 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 xdg-utils libsqlite3-dev
+      - name: Install static SQLite for Windows Normal core
+        if: runner.os == 'Windows' && matrix.edition == 'normal'
+        shell: pwsh
+        run: |
+          vcpkg install sqlite3:x64-windows-static-md
+          $sqliteLib = "C:\vcpkg\installed\x64-windows-static-md\lib"
+          "LIB=$sqliteLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RUSTFLAGS=-L native=$sqliteLib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: dtolnay/rust-toolchain@stable
@@ -122,16 +135,68 @@ jobs:
       - run: sdkmanager "ndk;28.2.13676358"
       - run: npm ci
       - run: node scripts/prepare-edition.mjs light
-      - shell: bash
-        run: if [ ! -d src-tauri/gen/android ]; then npm run tauri -- android init --ci; fi
+      - name: Recreate Android project for the Light identifier
+        shell: bash
+        run: |
+          rm -rf src-tauri/gen/android
+          npm run android:init:light
       - name: Build Light Android APK
         env:
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/28.2.13676358
-        run: npm run tauri -- android build --ci --debug --apk --target aarch64 --config src-tauri/tauri.light.conf.json
+        run: npm run build:android
       - uses: actions/upload-artifact@v4
         with:
           name: IEUM-Wallet-Light-v${{ inputs.version }}-android-arm64
           path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+  android-release:
+    name: Android Light / signed release AAB
+    if: ${{ inputs.android_release }}
+    needs: validate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: aarch64-linux-android }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "ndk;28.2.13676358"
+      - run: npm ci
+      - run: node scripts/prepare-edition.mjs light
+      - name: Recreate Android project for the Light identifier
+        run: |
+          rm -rf src-tauri/gen/android
+          npm run android:init:light
+      - name: Configure Android release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ieum-wallet-release.jks"
+          {
+            printf 'password=%s\n' "$ANDROID_KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'storeFile=%s\n' "$RUNNER_TEMP/ieum-wallet-release.jks"
+          } > src-tauri/gen/android/keystore.properties
+      - name: Build signed Android App Bundle
+        env:
+          NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/28.2.13676358
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npm run tauri -- android build --ci --aab --target aarch64 --config src-tauri/tauri.light.conf.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IEUM-Wallet-Light-v${{ inputs.version }}-android-release-aab
+          path: src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
           if-no-files-found: error
 
   migration-default:

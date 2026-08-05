@@ -18,7 +18,8 @@ button:hover { filter:brightness(1.08); } button:disabled { opacity:.45; cursor:
 .secondary { color:#dbe8f5; background:#1a2c3f; border:1px solid #2c4259; }
 .text-button { width:auto; padding:5px 0; margin-bottom:18px; background:none; color:#93aac0; }
 .stack { display:grid; gap:14px; }
-input, textarea, select { width:100%; margin-top:7px; padding:13px 14px; border:1px solid #2b4057; border-radius:12px; outline:none; color:#f3f7fb; background:#071522; }
+input, textarea, select { width:100%; margin-top:7px; padding:13px 14px; border:1px solid #2b4057; border-radius:12px; outline:none; color:#f3f7fb; background:#071522; color-scheme:dark; }
+select option { color:#f3f7fb; background:#071522; }
 input:focus, textarea:focus, select:focus { border-color:#2ed4a6; box-shadow:0 0 0 3px #2ed4a620; }
 textarea { min-height:100px; resize:vertical; }
 .columns { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; margin:18px 0; }

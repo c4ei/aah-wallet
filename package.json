@@ -1,7 +1,7 @@
 {
   "name": "ieum-wallet",
   "private": true,
-  "version": "0.0.10-2",
+  "version": "0.0.10-3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,8 @@
     "build:windows": "npm run tauri -- build --bundles nsis,msi",
     "build:light": "node scripts/prepare-edition.mjs light && npm run tauri -- build --config src-tauri/tauri.light.conf.json",
     "build:normal": "node scripts/prepare-edition.mjs normal && npm run tauri -- build --config src-tauri/tauri.normal.conf.json --features embedded-core",
-    "build:android": "npm run tauri -- android build --ci --debug --apk --target aarch64"
+    "android:init:light": "npm run tauri -- android init --ci --config src-tauri/tauri.light.conf.json",
+    "build:android": "npm run tauri -- android build --ci --debug --apk --target aarch64 --config src-tauri/tauri.light.conf.json"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
