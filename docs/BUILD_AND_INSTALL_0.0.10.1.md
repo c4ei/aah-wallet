@@ -21,7 +21,7 @@ sudo apt-get install -y \
 
 ```bash
 npm ci
-DISPLAY_VERSION=0.0.10.3 npm run validate:release
+DISPLAY_VERSION=0.0.10.4 npm run validate:release
 npm run build
 npm test
 cd src-tauri

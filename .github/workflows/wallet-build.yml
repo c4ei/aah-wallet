@@ -6,12 +6,12 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.0.10.3
+        default: 0.0.10.4
         type: string
       core_ref:
         description: ieum-chain tag, branch or commit for Normal
         required: true
-        default: main
+        default: v0.21.5
         type: string
       android_release:
         description: Build a signed Android release AAB (requires Android signing secrets)
@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 env:
-  DISPLAY_VERSION: 0.0.10.3
+  DISPLAY_VERSION: 0.0.10.4
 
 jobs:
   validate:
@@ -77,6 +77,12 @@ jobs:
           $sqliteLib = "C:\vcpkg\installed\x64-windows-static-md\lib"
           "LIB=$sqliteLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RUSTFLAGS=-L native=$sqliteLib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify Windows Normal core source version
+        if: runner.os == 'Windows' && matrix.edition == 'normal'
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --no-deps --format-version 1 --manifest-path ieum-chain-source/Cargo.toml | ConvertFrom-Json).packages[0].version
+          if ($version -ne "0.21.5") { throw "Normal core must be IEUM Chain 0.21.5 (actual: $version)" }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: dtolnay/rust-toolchain@stable
