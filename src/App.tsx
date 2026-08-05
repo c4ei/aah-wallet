@@ -72,6 +72,11 @@ import {
 type Screen = "home" | "create" | "restore";
 type Tab = "wallet" | "exchange" | "reward" | "social" | "chat" | "site" | "profile";
 
+// 준비 중인 기능은 코드와 테스트를 유지하되 운영 UI에서는 노출하지 않는다.
+// 추후 빌드 환경변수를 true로 설정하면 다시 표시할 수 있다.
+const showUsdtExchange = import.meta.env.VITE_SHOW_USDT_EXCHANGE === "true";
+const showAdRewards = import.meta.env.VITE_SHOW_AD_REWARDS === "true";
+
 interface NetworkStatus {
   nodeVersion: string;
   protocolVersion: string;
@@ -908,8 +913,8 @@ export default function App() {
       <header><span className="logo">A</span><div><h1>{profile.nickname || "IEUM Wallet"}</h1><p className={networkOk ? "online" : ""}>● {networkOk ? "IEUM 네트워크 연결됨" : "연결 확인 필요"}</p></div>{!networkOk && <button className="secondary small" onClick={() => setShowNetworkSettings(true)}>연결 문제</button>}<button className="secondary small" onClick={lock}>잠금</button></header>
       <nav className="tabs" aria-label="주요 기능">
         <button className={tab === "wallet" ? "active" : ""} onClick={() => setTab("wallet")}>지갑</button>
-        <button className={tab === "exchange" ? "active" : ""} onClick={() => setTab("exchange")}>USDT 교환</button>
-        <button className={tab === "reward" ? "active" : ""} onClick={() => setTab("reward")}>광고 보상</button>
+        {showUsdtExchange && <button className={tab === "exchange" ? "active" : ""} onClick={() => setTab("exchange")}>USDT 교환</button>}
+        {showAdRewards && <button className={tab === "reward" ? "active" : ""} onClick={() => setTab("reward")}>광고 보상</button>}
         <button className={tab === "social" ? "active" : ""} onClick={() => setTab("social")}>친구·그룹</button>
         <button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>채팅</button>
         <button className={tab === "site" ? "active" : ""} onClick={() => setTab("site")}>IEUM 사이트</button>
@@ -971,7 +976,7 @@ export default function App() {
           : <p className="muted">최근 전송 내역이 없습니다.</p>}
       </section>
       </>}
-      {tab === "exchange" && (
+      {showUsdtExchange && tab === "exchange" && (
         <section className="exchange-layout">
           <div className="card exchange-hero">
             <span className="eyebrow">IEUM SIMPLE SWAP · v0.0.4.3</span>
@@ -1050,7 +1055,7 @@ export default function App() {
           </div>
         </section>
       )}
-      {tab === "reward" && (
+      {showAdRewards && tab === "reward" && (
         <section className="card reward-card">
           <span className="eyebrow">v0.0.2.1 · 개발 연동 모드</span>
           <h2>4시간마다 광고 참여 보상</h2>
